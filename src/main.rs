@@ -7,6 +7,8 @@ use path_slash::PathExt as _;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+const VERSION: &str = include_str!("version");
+
 fn get_epoch() -> u64 {
     let start = SystemTime::now();
     let since_the_epoch = start
@@ -44,9 +46,88 @@ fn make_fcpxml_from_ranges(ranges: Vec<Vec<i32>>, asset_duration: i32, audio_rat
     let library = Path::new(save_path).to_slash().unwrap().to_string();
     format!("{header}{format}{asset}{library}{event_project_sequence}{clips}{end}")
 }
+
+fn version() -> f32 {
+    VERSION.parse::<f32>().unwrap()
+}
+
+fn latest_version() -> f32 {
+    println!("Comprobando actualizaciones...");
+    let request = reqwest::blocking::get("https://raw.githubusercontent.com/littletsu/kagari/master/src/version");
+    let version = match request {
+        Ok(response) => {
+            let parse = response.text().unwrap().parse::<f32>();
+            match parse {
+                Ok(latest) => {
+                    latest
+                }, 
+                Err(_) => {
+                    println!("Hubo un error al procesar la version del servidor.");
+                    version()
+                }
+            }
+        },
+        Err(_) => {
+            println!("Hubo un error al obtener la version del servidor.");
+            version()
+        }
+    };
+    version
+}
+
+fn get_changelog() -> String {
+    let request = reqwest::blocking::get("https://raw.githubusercontent.com/littletsu/kagari/master/changelog");
+    let changelog = match request {
+        Ok(response) => {
+            response.text().unwrap()
+        },
+        Err(_) => {
+            String::from("Hubo un error al obtener la lista de cambios.")
+        }
+    };
+    changelog
+}
+
+fn download_version(version: f32) -> bool {
+    let request = reqwest::blocking::get(format!("https://github.com/littletsu/kagari/releases/download/{version}/kagari.exe"));
+    let result = match request {
+        Ok(response) => {
+            let text = response.bytes().unwrap();
+
+            let bin_name = env::args().nth(0).unwrap();
+            let bin_filename = Path::new(&bin_name).file_name().unwrap().to_str().unwrap();
+            let bin_new_path = bin_name.replace(bin_filename, "kagari_old");
+            std::fs::rename(&bin_name, &bin_new_path).unwrap();
+
+            let mut file = std::fs::File::create(bin_name).unwrap();
+            let mut content =  std::io::Cursor::new(text);
+            std::io::copy(&mut content, &mut file).unwrap();
+            
+            true
+        },
+        Err(_) => {
+            println!("Hubo un error al descargar la nueva version.");
+            false
+        }
+    };
+    result
+}
 fn main() {
-    let version = include_str!("version");
-    println!("Kagari Version {version}");
+    println!("Kagari Version {VERSION}");
+    let latest = latest_version();
+    if latest > version() {
+        println!("Cambios de la version {}:\n{}", latest, get_changelog());
+        println!("Hay una nueva version de Kagari ({}). Actualizando", latest);
+        if download_version(latest) {
+            println!("Se actualizo correctamente. Puedes cerrar esta ventana.");
+            loop {
+
+            }
+        } else {
+            println!("No se pudo descargar la actualizacion correctamente.");
+        }
+
+    }
     let default_config = Config {
         detection: DetectionConfig {
             energy: 24000.0,
