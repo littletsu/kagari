@@ -1,0 +1,6 @@
+/target
+*.xml
+*.js
+*.toml
+*.fcpxml
+*.wav
