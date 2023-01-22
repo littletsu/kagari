@@ -130,7 +130,7 @@ fn main() {
     }
     let default_config = Config {
         detection: DetectionConfig {
-            energy: 24000.0,
+            energy: 50000.0,
             sample_chunks_ms: 500
         }
     };
